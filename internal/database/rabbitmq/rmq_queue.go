@@ -53,7 +53,7 @@ func init() {
 
 // messageWrapper wraps a BatchJobPriority with metadata for internal use.
 type messageWrapper struct {
-	Job       *db_api.BatchJobPriority `json:"job"`
+	Job        *db_api.BatchJobPriority `json:"job"`
 	EnqueuedAt time.Time                `json:"enqueuedAt"`
 }
 

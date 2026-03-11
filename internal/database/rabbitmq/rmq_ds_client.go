@@ -30,13 +30,13 @@ import (
 )
 
 const (
-	priorityQueueName      = "llmd_batch_priority_queue"
-	maxPriority            = 10 // RabbitMQ supports 0-255, but 10 is recommended for better performance
-	defaultTimeout         = 20 * time.Second
-	reconnectDelay         = 5 * time.Second
-	maxReconnectAttempts   = 3
-	defaultPrefetchCount   = 1
-	channelCloseTimeout    = 5 * time.Second
+	priorityQueueName    = "llmd_batch_priority_queue"
+	maxPriority          = 10 // RabbitMQ supports 0-255, but 10 is recommended for better performance
+	defaultTimeout       = 20 * time.Second
+	reconnectDelay       = 5 * time.Second
+	maxReconnectAttempts = 3
+	defaultPrefetchCount = 1
+	channelCloseTimeout  = 5 * time.Second
 )
 
 var (

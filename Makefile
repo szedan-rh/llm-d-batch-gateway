@@ -327,6 +327,10 @@ KIND_CLUSTER_NAME ?= batch-gateway-dev
 dev-deploy:
 	@bash scripts/dev-deploy.sh
 
+## dev-deploy-gie: Deploy with GIE integration (per-model EPP + InferenceObjectives)
+dev-deploy-gie:
+	@ENABLE_GIE=true bash scripts/dev-deploy.sh
+
 ## dev-clean: Clean up dev deployment (removes all resources but keeps the kind cluster)
 dev-clean:
 	@bash scripts/dev-clean.sh

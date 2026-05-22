@@ -21,7 +21,7 @@ This script:
 5. Deploys a vLLM simulator as the inference backend
 6. Deploys batch-gateway via Helm
 7. Creates NodePort services mapping to `https://localhost:8000` (apiserver) and `http://localhost:8081` (apiserver observability)
-8. Starts a port-forward for processor observability at `http://localhost:9090`
+8. Starts a supervised port-forward for processor observability at `http://localhost:9090`
 
 **Environment variables**
 

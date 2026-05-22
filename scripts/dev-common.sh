@@ -25,6 +25,9 @@ LOCAL_OBS_PORT="${LOCAL_OBS_PORT:-8081}"
 LOCAL_PROCESSOR_PORT="${LOCAL_PROCESSOR_PORT:-9090}"
 JAEGER_PORT="${JAEGER_PORT:-16686}"
 PORT_FORWARD_STATE_DIR="${PORT_FORWARD_STATE_DIR:-/tmp}"
+PROCESSOR_PORT_FORWARD_PID_FILE="${PORT_FORWARD_STATE_DIR}/${HELM_RELEASE}-processor-port-forward.pid"
+PROCESSOR_PORT_FORWARD_STOP_FILE="${PORT_FORWARD_STATE_DIR}/${HELM_RELEASE}-processor-port-forward.stop"
+PROCESSOR_PORT_FORWARD_LOG_FILE="${PORT_FORWARD_STATE_DIR}/${HELM_RELEASE}-processor-port-forward.log"
 
 # Service names
 REDIS_RELEASE="${REDIS_RELEASE:-redis}"
@@ -51,14 +54,18 @@ FILES_PVC_NAME="${FILES_PVC_NAME:-${HELM_RELEASE}-files}"
 # ── Shared Functions ──────────────────────────────────────────────────────────
 
 stop_processor_port_forward() {
-    local pid_file="${PORT_FORWARD_STATE_DIR}/${HELM_RELEASE}-processor-port-forward.pid"
-    if [ -f "${pid_file}" ]; then
+    rm -f "${PROCESSOR_PORT_FORWARD_STOP_FILE}"
+    touch "${PROCESSOR_PORT_FORWARD_STOP_FILE}"
+
+    if [ -f "${PROCESSOR_PORT_FORWARD_PID_FILE}" ]; then
         local pf_pid
-        pf_pid="$(cat "${pid_file}")"
+        pf_pid="$(cat "${PROCESSOR_PORT_FORWARD_PID_FILE}")"
         if kill -0 "${pf_pid}" 2>/dev/null; then
-            log "Stopping processor port-forward (pid ${pf_pid})..."
+            log "Stopping processor port-forward supervisor (pid ${pf_pid})..."
+            pkill -TERM -P "${pf_pid}" 2>/dev/null || true
             kill "${pf_pid}" 2>/dev/null || true
         fi
-        rm -f "${pid_file}"
     fi
+
+    rm -f "${PROCESSOR_PORT_FORWARD_PID_FILE}"
 }

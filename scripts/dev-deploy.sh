@@ -1186,29 +1186,42 @@ wait_for_http_ready() {
 }
 
 start_processor_port_forward() {
-    local state_dir="${PORT_FORWARD_STATE_DIR}"
-    local pid_file="${state_dir}/${HELM_RELEASE}-processor-port-forward.pid"
-    local log_file="${state_dir}/${HELM_RELEASE}-processor-port-forward.log"
-
-    mkdir -p "${state_dir}"
+    mkdir -p "${PORT_FORWARD_STATE_DIR}"
 
     stop_processor_port_forward
+    rm -f "${PROCESSOR_PORT_FORWARD_STOP_FILE}" "${PROCESSOR_PORT_FORWARD_LOG_FILE}"
 
-    step "Starting processor port-forward on localhost:${LOCAL_PROCESSOR_PORT}..."
-    kubectl port-forward -n "${NAMESPACE}" \
-        "deployment/${HELM_RELEASE}-processor" \
-        "${LOCAL_PROCESSOR_PORT}:9090" >"${log_file}" 2>&1 &
+    step "Starting processor port-forward supervisor on localhost:${LOCAL_PROCESSOR_PORT}..."
+    bash -c '
+        trap "exit 0" TERM INT
+        while [ ! -f "$1" ]; do
+            kubectl port-forward -n "$2" \
+                "deployment/$3-processor" \
+                "$4:9090" >>"$5" 2>&1
+            status=$?
+            if [ -f "$1" ]; then
+                exit 0
+            fi
+            echo "[WARN] processor port-forward exited with status ${status}; retrying..." >>"$5"
+            sleep 1
+        done
+    ' _ \
+        "${PROCESSOR_PORT_FORWARD_STOP_FILE}" \
+        "${NAMESPACE}" \
+        "${HELM_RELEASE}" \
+        "${LOCAL_PROCESSOR_PORT}" \
+        "${PROCESSOR_PORT_FORWARD_LOG_FILE}" &
     local pf_pid=$!
-    echo "${pf_pid}" > "${pid_file}"
+    echo "${pf_pid}" > "${PROCESSOR_PORT_FORWARD_PID_FILE}"
 
     for i in $(seq 1 30); do
         if curl -sf "http://localhost:${LOCAL_PROCESSOR_PORT}/ready" >/dev/null 2>&1; then
-            log "Processor port-forward ready at http://localhost:${LOCAL_PROCESSOR_PORT} (pid ${pf_pid})"
+            log "Processor port-forward ready at http://localhost:${LOCAL_PROCESSOR_PORT} (supervisor pid ${pf_pid})"
             return 0
         fi
         if ! kill -0 "${pf_pid}" 2>/dev/null; then
-            warn "Processor port-forward exited unexpectedly:"
-            [ -f "${log_file}" ] && cat "${log_file}" || true
+            warn "Processor port-forward supervisor exited unexpectedly:"
+            [ -f "${PROCESSOR_PORT_FORWARD_LOG_FILE}" ] && cat "${PROCESSOR_PORT_FORWARD_LOG_FILE}" || true
             die "Failed to start processor port-forward"
         fi
         sleep 1

@@ -28,7 +28,13 @@ The asymmetry — fast decrease, slow increase — is intentional: the system ba
 
 2. **Install the VS Code REST Client extension** (Ctrl+Shift+X / Cmd+Shift+X), or use `curl` manually.
 
-3. **Open Grafana** in your browser: <http://localhost:3000>
+3. **Port-forward the simulator** (needed for runtime failure toggling):
+
+   ```bash
+   kubectl port-forward svc/vllm-sim-aimd 8888:8000 -n default
+   ```
+
+4. **Open Grafana** in your browser: <http://localhost:3000>
    - Navigate to the **Processor** dashboard (UID: `batch-gateway-processor`)
    - Locate the two AIMD panels:
      - **AIMD Concurrency Limit per Endpoint** — shows the live limit
@@ -57,16 +63,17 @@ The `sim-model-aimd` simulator is deployed with **100% `rate_limit` failure inje
 
 ### Phase 2: Clear Failures and Observe Recovery
 
-Patch the simulator to stop injecting failures:
+Use the simulator's runtime admin API to disable failure injection instantly (no pod restart):
 
 ```bash
-kubectl patch deployment vllm-sim-aimd -n default --type=json \
-  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/args","value":["--model","sim-model-aimd","--time-to-first-token","10ms","--inter-token-latency","10ms","--failure-injection-rate=0","--failure-types=rate_limit"]}]'
-
-kubectl rollout status deployment/vllm-sim-aimd -n default --timeout=60s
+curl -X POST http://localhost:8888/admin/config \
+  -H 'Content-Type: application/json' \
+  -d '{"failure-injection-rate": 0}'
 ```
 
-Then run **Sequence 2** in `demo.http`: upload a new input file and create a batch.
+Or run the "Disable Failure Injection" request in **Sequence 2** of `demo.http`.
+
+Then upload a new input file and create a batch.
 
 **Expected behavior**:
 
@@ -77,14 +84,15 @@ Then run **Sequence 2** in `demo.http`: upload a new input file and create a bat
 
 ### Phase 3: Reset
 
-Restore the simulator to its original state for the next demo:
+Restore failure injection for the next demo run:
 
 ```bash
-kubectl patch deployment vllm-sim-aimd -n default --type=json \
-  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/args","value":["--model","sim-model-aimd","--time-to-first-token","10ms","--inter-token-latency","10ms","--failure-injection-rate=100","--failure-types=rate_limit"]}]'
-
-kubectl rollout status deployment/vllm-sim-aimd -n default --timeout=60s
+curl -X POST http://localhost:8888/admin/config \
+  -H 'Content-Type: application/json' \
+  -d '{"failure-injection-rate": 100, "failure-types": ["rate_limit"]}'
 ```
+
+Or run the "Restore 100% Failure Injection" request in **Sequence 3** of `demo.http`.
 
 ## Monitoring
 
@@ -117,11 +125,11 @@ Query directly via the Prometheus UI at <http://localhost:9091>:
 
 - The 50-request input file with 10ms latency processes quickly. If needed, submit multiple batches in rapid succession to sustain traffic.
 
-### kubectl Patch Not Taking Effect
+### Admin Config Not Taking Effect
 
-- Wait for the rollout to complete: `kubectl rollout status deployment/vllm-sim-aimd -n default`
-- Verify the pod restarted: `kubectl get pods -l app=vllm-sim-aimd -n default`
-- Check the new args: `kubectl get deployment vllm-sim-aimd -n default -o jsonpath='{.spec.template.spec.containers[0].args}'`
+- Verify the port-forward is running: `kubectl port-forward svc/vllm-sim-aimd 8888:8000 -n default`
+- Check current config: `curl http://localhost:8888/admin/config`
+- Verify the simulator is running: `kubectl get pods -l app=vllm-sim-aimd -n default`
 
 ### Grafana Not Showing Data
 

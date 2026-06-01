@@ -4,12 +4,14 @@
 # This demo shows AIMD (Additive Increase Multiplicative Decrease) adaptive
 # concurrency control in the batch processor. The sim-model-aimd simulator
 # starts with 100% failure injection, causing AIMD to drop concurrency to
-# its floor. After clearing failures, AIMD recovers back to full capacity.
+# its floor. After clearing failures via the runtime admin API, AIMD
+# recovers back to full capacity — all without pod restarts.
 #
 # Usage:
 # 1. Deploy the dev cluster: make dev-deploy
 # 2. Open Grafana: http://localhost:3000 → Processor dashboard → AIMD panels
-# 3. Follow sequences below in order
+# 3. Port-forward the simulator: kubectl port-forward svc/vllm-sim-aimd 8888:8000 -n default
+# 4. Follow sequences below in order
 
 # ============================================================
 # CONFIGURATION
@@ -21,6 +23,7 @@
 @apiKey = unused
 @inputFile = batch_input_aimd.jsonl
 @namespace = default
+@simAdminUrl = http://localhost:8888
 
 # ============================================================
 # SEQUENCE 1: Observe AIMD Drop Under Failures
@@ -81,17 +84,23 @@ Authorization: Bearer {{apiKey}}
 # SEQUENCE 2: Clear Failures and Observe AIMD Recovery
 # ============================================================
 #
-# Patch the simulator to 0% failure, then submit a new batch.
-# AIMD will additively increase concurrency back toward 10.
+# Use the simulator's runtime admin API to disable failure injection,
+# then submit a new batch. AIMD will additively increase concurrency
+# back toward 10. No pod restart needed — the change is instant.
 #
-# Run these kubectl commands in your terminal:
-#
-#   kubectl patch deployment vllm-sim-aimd -n default --type=json \
-#     -p='[{"op":"replace","path":"/spec/template/spec/containers/0/args","value":["--model","sim-model-aimd","--time-to-first-token","10ms","--inter-token-latency","10ms","--failure-injection-rate=0","--failure-types=rate_limit"]}]'
-#
-#   kubectl rollout status deployment/vllm-sim-aimd -n default --timeout=60s
-#
-# Wait for the rollout to complete before proceeding.
+# Requires: kubectl port-forward svc/vllm-sim-aimd 8888:8000 -n default
+
+### Get Current Simulator Config
+GET {{simAdminUrl}}/admin/config
+Accept: application/json
+
+### Disable Failure Injection (instant — no pod restart)
+POST {{simAdminUrl}}/admin/config
+Content-Type: application/json
+
+{
+  "failure-injection-rate": 0
+}
 
 ### Upload Batch Input File (recovery batch)
 # @name uploadRecovery
@@ -146,13 +155,15 @@ Authorization: Bearer {{apiKey}}
 # ============================================================
 # SEQUENCE 3: Reset Simulator (restore 100% failures)
 # ============================================================
-#
-# Restore the simulator to its original state for the next demo run:
-#
-#   kubectl patch deployment vllm-sim-aimd -n default --type=json \
-#     -p='[{"op":"replace","path":"/spec/template/spec/containers/0/args","value":["--model","sim-model-aimd","--time-to-first-token","10ms","--inter-token-latency","10ms","--failure-injection-rate=100","--failure-types=rate_limit"]}]'
-#
-#   kubectl rollout status deployment/vllm-sim-aimd -n default --timeout=60s
+
+### Restore 100% Failure Injection (for next demo run)
+POST {{simAdminUrl}}/admin/config
+Content-Type: application/json
+
+{
+  "failure-injection-rate": 100,
+  "failure-types": ["rate_limit"]
+}
 
 # ============================================================
 # MONITORING

@@ -310,7 +310,7 @@ deps-verify:
 	@echo "Verifying dependencies..."
 	$(GO) mod verify
 
-## test-integration: Run integration tests (each test spawns its own mock server)
+## test-integration: Run integration tests (in-process server with mock backends and external service integration, no cluster needed)
 test-integration:
 	@echo "Running integration tests..."
 	@$(GO) test -v -tags=integration ./... || \

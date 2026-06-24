@@ -41,9 +41,9 @@ JAEGER_NODE_PORT="${JAEGER_NODE_PORT:-30086}"
 PROMETHEUS_NODE_PORT="${PROMETHEUS_NODE_PORT:-30091}"
 GRAFANA_NODE_PORT="${GRAFANA_NODE_PORT:-30030}"
 MINIO_NODE_PORT="${MINIO_NODE_PORT:-30009}"
-APISERVER_IMG="${APISERVER_IMG:-ghcr.io/llm-d-incubation/batch-gateway-apiserver:${IMAGE_TAG}}"
-PROCESSOR_IMG="${PROCESSOR_IMG:-ghcr.io/llm-d-incubation/batch-gateway-processor:${IMAGE_TAG}}"
-GC_IMG="${GC_IMG:-ghcr.io/llm-d-incubation/batch-gateway-gc:${IMAGE_TAG}}"
+APISERVER_IMG="${APISERVER_IMG:-ghcr.io/llm-d/batch-gateway-apiserver:${IMAGE_TAG}}"
+PROCESSOR_IMG="${PROCESSOR_IMG:-ghcr.io/llm-d/batch-gateway-processor:${IMAGE_TAG}}"
+GC_IMG="${GC_IMG:-ghcr.io/llm-d/batch-gateway-gc:${IMAGE_TAG}}"
 # USE_KIND=true  → use kind; create cluster if it doesn't exist (default)
 # USE_KIND=false → use existing kubeconfig context (OpenShift / Kubernetes)
 USE_KIND="${USE_KIND:-true}"
@@ -248,7 +248,8 @@ create_tls_secret() {
 
     local tmp_dir
     tmp_dir="$(mktemp -d)"
-    trap "rm -rf ${tmp_dir}" RETURN
+    # shellcheck disable=SC2064  # Intentional: expand tmp_dir at definition time; it is local and out of scope when RETURN trap fires from caller
+    trap "rm -rf '${tmp_dir}'" RETURN
 
     openssl req -x509 -newkey rsa:2048 -nodes \
         -keyout "${tmp_dir}/tls.key" \

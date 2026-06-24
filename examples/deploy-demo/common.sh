@@ -85,9 +85,9 @@ MINIO_BUCKET="${MINIO_BUCKET:-batch-gateway}"
 # Image overrides. When set, these take precedence over defaults derived from
 # BATCH_RELEASE_VERSION / BATCH_DEV_VERSION. Leave unset to use chart defaults.
 # Example (upstream):
-#   BATCH_IMAGE_TAG=v0.1.0 BATCH_APISERVER_REPO=ghcr.io/llm-d-incubation/batch-gateway-apiserver \
-#   BATCH_PROCESSOR_REPO=ghcr.io/llm-d-incubation/batch-gateway-processor \
-#   BATCH_GC_REPO=ghcr.io/llm-d-incubation/batch-gateway-gc ./deploy-k8s.sh
+#   BATCH_IMAGE_TAG=v0.1.0 BATCH_APISERVER_REPO=ghcr.io/llm-d/batch-gateway-apiserver \
+#   BATCH_PROCESSOR_REPO=ghcr.io/llm-d/batch-gateway-processor \
+#   BATCH_GC_REPO=ghcr.io/llm-d/batch-gateway-gc ./deploy-k8s.sh
 BATCH_IMAGE_TAG="${BATCH_IMAGE_TAG:-}"
 BATCH_APISERVER_REPO="${BATCH_APISERVER_REPO:-}"
 BATCH_PROCESSOR_REPO="${BATCH_PROCESSOR_REPO:-}"
@@ -578,6 +578,7 @@ install_batch_gateway() {
 
     local chart version_args=()
     if [ -n "${BATCH_RELEASE_VERSION}" ]; then
+        # TODO: pre-graduation location; update to ghcr.io/llm-d in the next release
         chart="oci://ghcr.io/llm-d-incubation/charts/batch-gateway"
         version_args=(--version "${BATCH_RELEASE_VERSION#v}")
     elif [ "${BATCH_DEV_VERSION}" = "local" ]; then
@@ -587,7 +588,7 @@ install_batch_gateway() {
     else
         # Download chart from GitHub at the specific commit
         _BATCH_TMP_DIR=$(mktemp -d)
-        local tarball_url="https://github.com/llm-d-incubation/batch-gateway/archive/${BATCH_DEV_VERSION}.tar.gz"
+        local tarball_url="https://github.com/llm-d/llm-d-batch-gateway/archive/${BATCH_DEV_VERSION}.tar.gz"
         step "Downloading chart from commit ${BATCH_DEV_VERSION}..."
         local http_code
         http_code=$(curl -sL -o "${_BATCH_TMP_DIR}/archive.tar.gz" -w '%{http_code}' "${tarball_url}")
@@ -628,7 +629,20 @@ install_batch_gateway() {
         fi
     done
     if [ "${mismatch}" = "true" ]; then
-        warn "Image tags do not match expected version."
+        die "Image tags do not match expected version."
+    fi
+
+    # Verify OCI chart version for release installs
+    if [ -n "${BATCH_RELEASE_VERSION}" ]; then
+        local installed_ver
+        installed_ver=$(helm get metadata "${BATCH_HELM_RELEASE}" -n "${BATCH_NAMESPACE}" -o json 2>/dev/null \
+            | jq -r '.version // empty')
+        local expected_ver="${BATCH_RELEASE_VERSION#v}"
+        if [ "${installed_ver}" = "${expected_ver}" ]; then
+            log "Verified: OCI chart version ${installed_ver} matches release ${BATCH_RELEASE_VERSION}"
+        else
+            die "Chart version '${installed_ver}' does not match expected '${expected_ver}'"
+        fi
     fi
 
     log "batch-gateway installed."

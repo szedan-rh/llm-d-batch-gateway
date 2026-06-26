@@ -578,8 +578,7 @@ install_batch_gateway() {
 
     local chart version_args=()
     if [ -n "${BATCH_RELEASE_VERSION}" ]; then
-        # TODO: pre-graduation location; update to ghcr.io/llm-d in the next release
-        chart="oci://ghcr.io/llm-d-incubation/charts/batch-gateway"
+        chart="oci://ghcr.io/llm-d/charts/batch-gateway"
         version_args=(--version "${BATCH_RELEASE_VERSION#v}")
     elif [ "${BATCH_DEV_VERSION}" = "local" ]; then
         local repo_root
